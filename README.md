@@ -75,7 +75,7 @@ A third file, `exceptions.csv`, holds **risk acceptances**: cases where someone 
 With git:
 
 ```bash
-git clone https://github.com/<github-user>/ax9.git
+git clone https://github.com/aristoncandido/ax9.git
 cd ax9
 ```
 
