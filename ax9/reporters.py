@@ -1,9 +1,19 @@
-"""Writers: JSON (machines), CSV (spreadsheets), Markdown (GRC manager)."""
+"""Reporters: turn one RunResult into outputs for four different audiences.
+
+    results.json  -> machines (integrations, dashboards, evidence archive)
+    results.csv   -> GRC analysts (Excel / Google Sheets, pivot tables)
+    report.md     -> GRC manager (executive summary + what to do next)
+    terminal      -> whoever ran the command (colored tables via ui.py)
+
+Reporters never decide anything: every verdict was already made by the
+engine. They only choose what to show, in what order and in which format.
+To add another format (HTML, a ticketing API...), write one more function
+that takes a RunResult.
+"""
 from __future__ import annotations
 
 import csv
 import json
-import shutil
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -11,10 +21,13 @@ from typing import Any
 from .engine import ACTION_STATUSES, iso_utc, needs_action
 from .models import AssetFinding, RunResult, Status
 
+# Display order of statuses in summary tables (best to worst).
 STATUS_ORDER = [Status.PASS, Status.EXCEPTION, Status.STALE, Status.FAIL, Status.MISSING]
+# Used to sort risks: a "critical" card vault comes before a "low" HR portal.
 CRITICALITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 SEVERITY_RANK = {Status.MISSING: 0, Status.FAIL: 1, Status.STALE: 2}
 
+# Recommended action per failing status, shown in report.md section 7.
 ACTIONS = {
     Status.MISSING: "Onboard the asset to the SIEM (or fix the rejected/missing source) and confirm events arrive; open a ticket for the asset owner.",
     Status.FAIL: "Correct retention settings (>= 365d total, >= 90d hot) or investigate the integrity of the reported timestamp.",
@@ -23,11 +36,17 @@ ACTIONS = {
 
 
 def _ts(moment) -> str:
+    """Timestamp as text, or empty string when there is none."""
     return iso_utc(moment) if moment else ""
 
 
 def summarize(result: RunResult) -> dict[str, Any]:
-    """Counts per status plus compliance percentages."""
+    """Headline numbers shared by every output.
+
+    Two compliance figures on purpose: PASS only, and PASS + valid exceptions.
+    An accepted risk is not the same as compliance, and a GRC manager must see
+    both numbers side by side.
+    """
     counts = Counter(f.status for f in result.findings)
     total = len(result.findings)
     passed, excepted = counts[Status.PASS], counts[Status.EXCEPTION]
@@ -44,7 +63,13 @@ def summarize(result: RunResult) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# JSON
+# ---------------------------------------------------------------------------
+
+
 def _finding_dict(finding: AssetFinding) -> dict[str, Any]:
+    """One finding as plain JSON-friendly data, evidence included."""
     exc = finding.exception
     return {
         "control_id": finding.control_id,
@@ -86,6 +111,11 @@ def _finding_dict(finding: AssetFinding) -> dict[str, Any]:
 
 
 def write_json(result: RunResult, controls: dict[str, Any], path: Path) -> None:
+    """Complete, self-contained record of the run.
+
+    The controls used (thresholds + mappings) are embedded too, so the file
+    alone answers "which rules produced this verdict?" months later.
+    """
     document = {
         "run": {"as_of": _ts(result.as_of), "tool_version": result.tool_version, "input_sha256": result.input_hashes},
         "summary": summarize(result),
@@ -99,6 +129,10 @@ def write_json(result: RunResult, controls: dict[str, Any], path: Path) -> None:
     path.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+# ---------------------------------------------------------------------------
+# CSV
+# ---------------------------------------------------------------------------
+
 CSV_COLUMNS = [
     "control_id", "asset_id", "hostname", "environment", "owner", "criticality",
     "check_id", "check_status", "reason", "requirements",
@@ -106,29 +140,55 @@ CSV_COLUMNS = [
     "asset_status", "asset_underlying_status", "exception_state", "exception_approved_by", "exception_expires_at",
 ]
 
+# Spreadsheet apps treat a cell starting with one of these as a formula.
+FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value: object) -> str:
+    """Neutralise CSV/formula injection (CWE-1236).
+
+    Hostnames and exception reasons come from input files. A value such as
+    =HYPERLINK("http://evil","click") would run as a formula when the GRC
+    team opens results.csv in Excel. Prefixing a quote makes it plain text.
+    """
+    text = str(value)
+    return "'" + text if text.startswith(FORMULA_PREFIXES) else text
+
 
 def write_csv(result: RunResult, path: Path) -> None:
-    """One row per asset/check, flat, ready for pivot tables."""
+    """Flat table: one row per asset per check, ready for filters and pivots.
+
+    Asset-level columns repeat on each of the asset's rows so every row stands
+    alone (filter by check_status=FAIL and you still see owner and criticality).
+    """
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow(CSV_COLUMNS)
         for f in result.findings:
             for c in f.checks:
-                writer.writerow([
+                row = [
                     f.control_id, f.asset.asset_id, f.asset.hostname, f.asset.environment, f.asset.owner, f.asset.criticality,
                     c.check_id, c.status.value, c.reason, "; ".join(c.requirements),
                     c.evidence.source_file, c.evidence.value, _ts(c.evidence.observed_at), c.evidence.rule,
                     c.evidence.threshold, _ts(c.evidence.evaluated_at),
                     f.status.value, f.underlying_status.value, f.exception_state,
                     f.exception.approved_by if f.exception else "", _ts(f.exception.expires_at) if f.exception else "",
-                ])
+                ]
+                writer.writerow([_csv_safe(v) for v in row])
+
+
+# ---------------------------------------------------------------------------
+# Markdown report
+# ---------------------------------------------------------------------------
 
 
 def _cell(text: object) -> str:
+    """Escape characters that would break a Markdown table cell."""
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
 def _table(headers: list[str], rows: list[list[object]]) -> list[str]:
+    """Markdown table lines, or an explicit "None." (an empty section is information too)."""
     if not rows:
         return ["_None._", ""]
     lines = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
@@ -137,10 +197,17 @@ def _table(headers: list[str], rows: list[list[object]]) -> list[str]:
 
 
 def _risk_key(f: AssetFinding) -> tuple[int, int, str]:
+    """Sort key for "top risks": most critical asset first, then worst status."""
     return (CRITICALITY_RANK.get(f.asset.criticality, 9), SEVERITY_RANK.get(f.status, 9), f.asset.hostname)
 
 
 def render_markdown(result: RunResult, controls: dict[str, Any]) -> str:
+    """Build report.md, written for a GRC manager.
+
+    Sections go from "how bad is it?" (summary, top risks) to "why?" (by
+    requirement, evidence, exceptions) to "what now?" (actions), and end with
+    the input hashes that make the report verifiable.
+    """
     summary = summarize(result)
     findings = list(result.findings)
     at_risk = sorted((f for f in findings if f.status in ACTION_STATUSES), key=_risk_key)
@@ -169,6 +236,8 @@ def render_markdown(result: RunResult, controls: dict[str, Any]) -> str:
         [[f.asset.hostname, f.asset.criticality, f.status.value, ", ".join(f.failed_checks), f.asset.owner] for f in at_risk[:5]],
     )
 
+    # One subsection per framework requirement, with its rationale AND its
+    # limitation: saying what a check does not prove is part of honest reporting.
     out += ["## 2. Failures grouped by framework requirement", ""]
     for control in controls["controls"]:
         for mapping in control["mappings"]:
@@ -232,15 +301,21 @@ def write_markdown(result: RunResult, controls: dict[str, Any], path: Path) -> N
     path.write_text(render_markdown(result, controls), encoding="utf-8")
 
 
+# ---------------------------------------------------------------------------
+# Terminal tables
+# ---------------------------------------------------------------------------
+
 STATUS_COLORS = {
     Status.PASS: "green", Status.EXCEPTION: "cyan", Status.STALE: "yellow",
     Status.FAIL: "red", Status.MISSING: "bold_red",
 }
-NARROW_TERMINAL = 120  # below this width, drop the ID and OWNER columns
+NARROW_TERMINAL = 120  # below this width the ID and OWNER columns are hidden
+# Worst first, so the most urgent line is the first one the reader sees.
 TABLE_ORDER = {Status.MISSING: 0, Status.FAIL: 1, Status.STALE: 2, Status.EXCEPTION: 3, Status.PASS: 4}
 
 
 def _console_detail(f: AssetFinding) -> str:
+    """One-line explanation for the DETAIL column."""
     if f.status is Status.PASS:
         return "all checks passed"
     reasons = "; ".join(c.reason for c in f.checks if c.check_id in f.failed_checks)
@@ -252,7 +327,11 @@ def _console_detail(f: AssetFinding) -> str:
 
 
 def write_console(result: RunResult, ui: Any) -> None:
-    """Kali-style result tables on the terminal (stderr via the UI object)."""
+    """Kali-style summary on the terminal. `ui` is a ui.UI instance.
+
+    This is a quick view only: long details are truncated to fit the screen,
+    while the files above always keep the full text.
+    """
     summary = summarize(result)
     findings = sorted(
         result.findings,
@@ -260,11 +339,12 @@ def write_console(result: RunResult, ui: Any) -> None:
     )
     headers = ["ASSET", "ID", "CRITICALITY", "STATUS", "FAILED CHECKS", "OWNER", "DETAIL"]
     rows = [
+        # A (text, color) tuple tells ui.table to color that single cell.
         [f.asset.hostname, f.asset.asset_id, f.asset.criticality, (f.status.value, STATUS_COLORS[f.status]),
          ", ".join(f.failed_checks) or "-", f.asset.owner, _console_detail(f)]
         for f in findings
     ]
-    if shutil.get_terminal_size((140, 24)).columns < NARROW_TERMINAL:
+    if ui.width < NARROW_TERMINAL:
         keep = [i for i, h in enumerate(headers) if h not in ("ID", "OWNER")]
         headers = [headers[i] for i in keep]
         rows = [[row[i] for i in keep] for row in rows]

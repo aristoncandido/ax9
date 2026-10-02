@@ -1,4 +1,15 @@
-"""Unit tests for AX9. Run: python -m unittest discover -s tests -v"""
+"""Unit tests for AX9.
+
+Run them with:   python -m unittest discover -s tests -v
+
+How these tests are built: instead of reading the sample files, most tests
+create tiny in-memory objects with the helpers below (asset(), source(),
+exception()) and a fixed AS_OF, so each test shows exactly the one situation
+it checks. Tests that need real files write them to a temporary folder.
+
+Adding a rule? Add at least two tests: one where it passes and one where it
+fails. Then break the rule on purpose and confirm a test goes red.
+"""
 from __future__ import annotations
 
 import contextlib
@@ -12,14 +23,18 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ax9 import cli
-from ax9.engine import evaluate, merge_sources, needs_action
-from ax9.ingest import load_controls, load_siem_sources
+from ax9.engine import CHECKS, evaluate, merge_sources, needs_action
+from ax9.ingest import KNOWN_CHECKS, IngestError, load_controls, load_siem_sources
+from ax9.reporters import write_csv
 from ax9.models import Asset, LogSource, RiskException, Status
-from ax9.ui import UI
+from ax9.ui import UI, sanitize
 
 ROOT = Path(__file__).resolve().parent.parent
 AS_OF = datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc)
 CONTROLS = load_controls(ROOT / "controls.json")
+
+
+# --- helpers: build one object with sensible "compliant" defaults --------------
 
 
 def asset(host: str = "h1", asset_id: str = "A1", pci: bool = True) -> Asset:
@@ -38,6 +53,7 @@ def exception(asset_id: str = "A1", control: str = "LOG-01", approved_days_ago: 
 
 
 def run(assets, sources, exceptions=(), issues=()):
+    """Evaluate with the real controls.json at the fixed AS_OF."""
     return evaluate(list(assets), list(sources), list(exceptions), list(issues), CONTROLS, AS_OF, {})
 
 
@@ -254,6 +270,83 @@ class ConsoleTableTests(unittest.TestCase):
         lines = self._render([["a", "PASS"]], encoding="ascii")
         self.assertTrue(lines[0].strip().startswith("+-"))
         "\n".join(lines).encode("ascii")
+
+
+class ControlsValidationTests(unittest.TestCase):
+    """controls.json is edited by hand: mistakes must give a clear error, not a crash."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def _controls_with(self, change) -> Path:
+        document = json.loads((ROOT / "controls.json").read_text(encoding="utf-8"))
+        change(document["controls"][0])
+        path = self.tmp / "controls.json"
+        path.write_text(json.dumps(document), encoding="utf-8")
+        return path
+
+    def test_engine_and_validator_know_the_same_checks(self):
+        self.assertEqual(set(CHECKS), set(KNOWN_CHECKS))
+
+    def test_unknown_check_is_rejected(self):
+        path = self._controls_with(lambda c: c["checks"].update({"magic": {}}))
+        with self.assertRaisesRegex(IngestError, "unknown checks"):
+            load_controls(path)
+
+    def test_missing_threshold_is_rejected(self):
+        path = self._controls_with(lambda c: c["checks"]["retention"].pop("min_days"))
+        with self.assertRaisesRegex(IngestError, "min_days"):
+            load_controls(path)
+
+    def test_mapping_to_undefined_check_is_rejected(self):
+        path = self._controls_with(lambda c: c["mappings"][0]["supported_by"].append("ghost"))
+        with self.assertRaisesRegex(IngestError, "undefined checks"):
+            load_controls(path)
+
+
+class InputRobustnessTests(unittest.TestCase):
+    """A broken input must end in a clean error (exit 2), never a traceback."""
+
+    def test_directory_instead_of_file_exits_2(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            argv = ["--siem", str(tmp), "--controls", str(ROOT / "controls.json"),
+                    "--data-dir", str(ROOT / "sample_data"), "--out-dir", str(tmp / "out"), "--no-banner"]
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(cli.main(argv), 2)
+        finally:
+            shutil.rmtree(tmp)
+
+    def test_non_utf8_file_is_a_clean_error(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            path = tmp / "siem_sources.csv"
+            path.write_bytes("hostname,source_type,last_event_at,retention_days,hot_retention_days\nh\xe9,x,y,1,1\n".encode("latin-1"))
+            with self.assertRaisesRegex(IngestError, "UTF-8"):
+                load_siem_sources(path)
+        finally:
+            shutil.rmtree(tmp)
+
+
+class OutputSafetyTests(unittest.TestCase):
+    """Values from input files are untrusted; outputs must not let them execute."""
+
+    def test_csv_formula_injection_is_neutralised(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            result = run([asset(host='=HYPERLINK("http://evil","x")')], [])
+            write_csv(result, tmp / "results.csv")
+            text = (tmp / "results.csv").read_text(encoding="utf-8")
+            self.assertIn("'=HYPERLINK", text)
+            self.assertNotIn(",=HYPERLINK", text)
+        finally:
+            shutil.rmtree(tmp)
+
+    def test_terminal_escape_sequences_are_stripped(self):
+        self.assertEqual(sanitize("pay\x1b[2Jgw"), "pay?[2Jgw")
 
 
 if __name__ == "__main__":

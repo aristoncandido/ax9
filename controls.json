@@ -1,4 +1,13 @@
 {
+  "_how_to_edit": [
+    "This file holds the RULES. Change a number here and re-run: no code change needed.",
+    "checks: thresholds per check. freshness.max_age_hours, retention.min_days and hot_retention.min_days must be non-negative numbers.",
+    "scope: which assets the control applies to (an assets.csv column and the value it must have).",
+    "status_precedence: when several checks fail, the first status in this list wins.",
+    "mappings: which framework requirement each check supports, WHY (rationale) and what it does NOT prove (limitation).",
+    "Keys starting with '_' are notes for humans and are ignored by AX9.",
+    "A new kind of check needs code first: see the docstring at the top of ax9/engine.py."
+  ],
   "controls": [
     {
       "id": "LOG-01",
