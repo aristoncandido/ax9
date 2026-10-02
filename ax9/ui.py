@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import time
 from typing import Sequence, TextIO, Union
 
 from . import __version__
@@ -31,15 +32,24 @@ ASCII_BOX = {"top": "+++", "mid": "+++", "bot": "+++", "h": "-", "v": "|", "full
 
 Cell = Union[str, tuple[str, str]]  # plain text, or (text, color name)
 
+SPINNER_UNICODE = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+SPINNER_ASCII = "|/-\\"
+HIDE_CURSOR, SHOW_CURSOR, CLEAR_LINE = "\033[?25l", "\033[?25h", "\r\033[K"
+BANNER_LINE_DELAY = 0.06
+TAGLINE_CHAR_DELAY = 0.012
+STEP_SECONDS = 0.22
+STEP_FRAMES = 8
+
 
 class UI:
     """Writes banner, Metasploit-style progress lines and tables to a stream."""
 
-    def __init__(self, stream: TextIO | None = None, show_banner: bool = True) -> None:
+    def __init__(self, stream: TextIO | None = None, show_banner: bool = True, animate: bool = True) -> None:
         self.stream = stream if stream is not None else sys.stderr
         self.is_tty = self.stream.isatty()
         self.color = self.is_tty and not os.environ.get("NO_COLOR")
         self.show_banner = show_banner and self.is_tty
+        self.animate = animate and self.is_tty
         self._ensure_utf8()
         self.unicode = self._can_encode(BANNER + "".join(UNICODE_BOX.values()))
         self.box = UNICODE_BOX if self.unicode else ASCII_BOX
@@ -70,8 +80,24 @@ class UI:
         """Print the ASCII banner, or a plain title if box characters can't be encoded."""
         if not self.show_banner:
             return
-        self._write(self._paint(BANNER if self.unicode else "AX9", "red"))
-        self._write(f"  v{__version__}  {TAGLINE}\n")
+        art = BANNER if self.unicode else "AX9"
+        tagline = f"  v{__version__}  {TAGLINE}"
+        if not self.animate:
+            self._write(self._paint(art, "red"))
+            self._write(tagline + "\n")
+            return
+        for row in art.splitlines():
+            self._write(self._paint(row, "red"))
+            time.sleep(BANNER_LINE_DELAY)
+        for char in tagline:
+            self.stream.write(char)
+            self.stream.flush()
+            time.sleep(TAGLINE_CHAR_DELAY)
+        self._write("\n")
+
+    def progress(self, total: int) -> "Progress":
+        """Animated single-line progress bar; does nothing when animation is off."""
+        return Progress(self, total)
 
     def _line(self, kind: str, message: str) -> None:
         prefix, color = PREFIXES[kind]
@@ -136,3 +162,47 @@ class UI:
         color = "green" if percent >= 90 else "yellow" if percent >= 50 else "red"
         gauge = self._paint(self.box["full"] * filled, color) + self._paint(self.box["empty"] * (width - filled), "dim")
         self._write(f"    {label:<28} [{gauge}] {self._paint(f'{percent:5.1f}%', color)}")
+
+
+class Progress:
+    """Context manager drawing one redrawn line: spinner, step label, bar, percent.
+    Each step() is a real stage of the run; the short animation only paces it."""
+
+    def __init__(self, ui: UI, total: int) -> None:
+        self.ui = ui
+        self.total = total
+        self.done = 0
+        self.frame = 0
+        self.spinner = SPINNER_UNICODE if ui.unicode else SPINNER_ASCII
+
+    def __enter__(self) -> "Progress":
+        if self.ui.animate:
+            self.ui.stream.write(HIDE_CURSOR)
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        if self.ui.animate:
+            if exc_type is None and self.done == self.total:
+                time.sleep(STEP_SECONDS)
+            self.ui.stream.write(CLEAR_LINE + SHOW_CURSOR)
+            self.ui.stream.flush()
+        return False
+
+    def step(self, label: str) -> None:
+        if not self.ui.animate:
+            return
+        start = self.done / self.total
+        self.done += 1
+        end = self.done / self.total
+        for i in range(1, STEP_FRAMES + 1):
+            self._draw(label, start + (end - start) * i / STEP_FRAMES)
+            time.sleep(STEP_SECONDS / STEP_FRAMES)
+
+    def _draw(self, label: str, fraction: float) -> None:
+        ui, width = self.ui, 24
+        filled = round(width * fraction)
+        spin = self.spinner[self.frame % len(self.spinner)]
+        self.frame += 1
+        gauge = ui._paint(ui.box["full"] * filled, "green") + ui._paint(ui.box["empty"] * (width - filled), "dim")
+        ui.stream.write(f"{CLEAR_LINE}{ui._paint(spin, 'cyan')} {label:<36} [{gauge}] {fraction * 100:3.0f}%")
+        ui.stream.flush()

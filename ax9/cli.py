@@ -35,13 +35,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--controls", type=Path, default=Path("controls.json"), help="controls definition file")
     parser.add_argument("--as-of", help="evaluation time, ISO 8601 UTC (default: now); fix it for reproducible runs")
     parser.add_argument("--no-banner", action="store_true", help="do not print the banner")
+    parser.add_argument("--no-anim", action="store_true", help="skip the banner animation and progress bar")
     parser.add_argument("--version", action="version", version=f"ax9 {__version__}")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    ui = UI(show_banner=not args.no_banner)
+    ui = UI(show_banner=not args.no_banner, animate=not args.no_anim)
     ui.banner()
     try:
         as_of = parse_timestamp(args.as_of) if args.as_of else datetime.now(timezone.utc).replace(microsecond=0)
@@ -53,14 +54,30 @@ def main(argv: list[str] | None = None) -> int:
     siem_path = args.siem or args.data_dir / SIEM_FILE
     exceptions_path = args.exceptions or args.data_dir / EXCEPTIONS_FILE
     try:
-        controls = load_controls(args.controls)
-        assets, issues = load_assets(assets_path)
-        sources, siem_issues = load_siem_sources(siem_path)
-        exceptions, exc_issues = load_exceptions(exceptions_path)
-        hashes = {path.name: sha256_file(path) for path in (assets_path, siem_path, exceptions_path, args.controls)}
+        with ui.progress(total=7) as progress:
+            progress.step("Loading control definitions")
+            controls = load_controls(args.controls)
+            progress.step("Parsing asset inventory")
+            assets, issues = load_assets(assets_path)
+            progress.step("Parsing SIEM log sources")
+            sources, siem_issues = load_siem_sources(siem_path)
+            progress.step("Loading risk exceptions")
+            exceptions, exc_issues = load_exceptions(exceptions_path)
+            progress.step("Hashing evidence (SHA-256)")
+            hashes = {path.name: sha256_file(path) for path in (assets_path, siem_path, exceptions_path, args.controls)}
+            all_issues = issues + siem_issues + exc_issues
+            progress.step("Evaluating controls and exceptions")
+            result = evaluate(assets, sources, exceptions, all_issues, controls, as_of, hashes, siem_path.name)
+            progress.step("Writing audit reports")
+            args.out_dir.mkdir(parents=True, exist_ok=True)
+            reporters.write_json(result, controls, args.out_dir / "results.json")
+            reporters.write_csv(result, args.out_dir / "results.csv")
+            reporters.write_markdown(result, controls, args.out_dir / "report.md")
     except IngestError as exc:
         ui.error(str(exc))
         return EXIT_ERROR
+
+    ui.success("compliance scan complete")
 
     control_ids = ", ".join(c["id"] for c in controls["controls"])
     frameworks = sorted({m["framework"] for c in controls["controls"] for m in c["mappings"]})
@@ -69,16 +86,8 @@ def main(argv: list[str] | None = None) -> int:
     ui.info(f"as-of: {iso_utc(as_of)}")
     ui.info(f"inputs: {assets_path}, {siem_path}, {exceptions_path}")
     ui.info(f"loaded {len(assets)} assets, {len(sources)} SIEM sources, {len(exceptions)} exceptions")
-    all_issues = issues + siem_issues + exc_issues
     if all_issues:
         ui.warning(f"{len(all_issues)} input row(s) rejected as evidence quality issues")
-
-    result = evaluate(assets, sources, exceptions, all_issues, controls, as_of, hashes, siem_path.name)
-
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    reporters.write_json(result, controls, args.out_dir / "results.json")
-    reporters.write_csv(result, args.out_dir / "results.csv")
-    reporters.write_markdown(result, controls, args.out_dir / "report.md")
 
     reporters.write_console(result, ui)
 

@@ -42,6 +42,7 @@ python -m ax9 --assets cmdb_export.csv --siem splunk_sources_2026-10.csv --excep
 | `--as-of` | now (UTC) | Evaluation time. Fix it to make a run reproducible |
 | `--out-dir` | `output` | Where the reports are written |
 | `--no-banner` | off | Hide the ASCII banner |
+| `--no-anim` | off | Skip the banner animation and progress bar |
 
 AX9 is deliberately **non-interactive**: it never prompts. That way the same command runs on a laptop, a cron job or a CI pipeline.
 
@@ -54,6 +55,8 @@ AX9 is deliberately **non-interactive**: it never prompts. That way the same com
 | `2` | The run itself failed (missing file, invalid `--as-of`, bad `controls.json`) |
 
 ### Terminal output
+
+On an interactive terminal, AX9 opens with an animated banner and a progress bar whose steps are the real stages of the run (load controls, parse inventory, parse SIEM sources, load exceptions, hash evidence, evaluate, write reports). The animation adds about 2.5 seconds and is skipped automatically when stderr is not a terminal (CI, pipes, cron), or on request with `--no-anim`.
 
 Besides the report files, every run prints a colored summary on the terminal: a findings table sorted worst-first (MISSING → FAIL → STALE → EXCEPTION → PASS, then by asset criticality), untracked hosts, evidence quality issues and a compliance gauge.
 
