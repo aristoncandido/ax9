@@ -53,7 +53,28 @@ AX9 is deliberately **non-interactive**: it never prompts. That way the same com
 | `1` | Action required: MISSING, FAIL, STALE, untracked hosts, expired exceptions or evidence quality issues |
 | `2` | The run itself failed (missing file, invalid `--as-of`, bad `controls.json`) |
 
-Banner and progress go to **stderr**, so stdout stays clean for pipes. Colors are disabled automatically when stderr is not a terminal or when `NO_COLOR` is set.
+### Terminal output
+
+Besides the report files, every run prints a colored summary on the terminal: a findings table sorted worst-first (MISSING → FAIL → STALE → EXCEPTION → PASS, then by asset criticality), untracked hosts, evidence quality issues and a compliance gauge.
+
+```
+[*] Findings: LOG-01 (worst first)
+    ┌──────────────────┬──────┬─────────────┬───────────┬───────────────┬───────────────────┬──────────────────────────────────────────┐
+    │ ASSET            │ ID   │ CRITICALITY │ STATUS    │ FAILED CHECKS │ OWNER             │ DETAIL                                   │
+    ├──────────────────┼──────┼─────────────┼───────────┼───────────────┼───────────────────┼──────────────────────────────────────────┤
+    │ pay-tokenizer-01 │ A009 │ critical    │ MISSING   │ coverage      │ security-eng      │ SIEM row rejected as untrustworthy evid… │
+    │ card-vault-01    │ A004 │ critical    │ FAIL      │ hot_retention │ security-eng      │ hot_retention_days is 30d, minimum is 90d│
+    │ ...              │      │             │           │               │                   │                                          │
+    └──────────────────┴──────┴─────────────┴───────────┴───────────────┴───────────────────┴──────────────────────────────────────────┘
+
+[*] Compliance
+    PASS only                    [███░░░░░░░░░░░░░░░░░░░░░░░░░░░]  11.1%
+    PASS + accepted exceptions   [███████░░░░░░░░░░░░░░░░░░░░░░░]  22.2%
+```
+
+The table fits the terminal width: long details are truncated, and below 120 columns the ID and OWNER columns are hidden. The full detail is always in `report.md` and `results.csv`.
+
+Banner, progress and tables go to **stderr**, so stdout stays clean for pipes. Colors are disabled automatically when stderr is not a terminal or when `NO_COLOR` is set, and box-drawing characters fall back to plain ASCII on consoles that cannot encode them.
 
 ---
 

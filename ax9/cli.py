@@ -80,6 +80,8 @@ def main(argv: list[str] | None = None) -> int:
     reporters.write_csv(result, args.out_dir / "results.csv")
     reporters.write_markdown(result, controls, args.out_dir / "report.md")
 
+    reporters.write_console(result, ui)
+
     summary = reporters.summarize(result)
     counts = ", ".join(f"{k}={v}" for k, v in summary["by_status"].items() if v)
     line = f"{summary['in_scope_assets']} in-scope assets: {counts}; compliance {summary['compliance_pct']}%"
@@ -87,5 +89,5 @@ def main(argv: list[str] | None = None) -> int:
         ui.warning(f"{line}; untracked={summary['untracked_hosts']}, expired exceptions={summary['expired_exceptions']}")
     else:
         ui.success(line)
-    ui.info(f"report: {args.out_dir / 'report.md'}")
+    ui.info(f"reports: {args.out_dir / 'report.md'}, results.csv, results.json")
     return EXIT_ACTION if summary["action_required"] else EXIT_OK

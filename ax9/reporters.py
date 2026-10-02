@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -229,3 +230,57 @@ def render_markdown(result: RunResult, controls: dict[str, Any]) -> str:
 
 def write_markdown(result: RunResult, controls: dict[str, Any], path: Path) -> None:
     path.write_text(render_markdown(result, controls), encoding="utf-8")
+
+
+STATUS_COLORS = {
+    Status.PASS: "green", Status.EXCEPTION: "cyan", Status.STALE: "yellow",
+    Status.FAIL: "red", Status.MISSING: "bold_red",
+}
+NARROW_TERMINAL = 120  # below this width, drop the ID and OWNER columns
+TABLE_ORDER = {Status.MISSING: 0, Status.FAIL: 1, Status.STALE: 2, Status.EXCEPTION: 3, Status.PASS: 4}
+
+
+def _console_detail(f: AssetFinding) -> str:
+    if f.status is Status.PASS:
+        return "all checks passed"
+    reasons = "; ".join(c.reason for c in f.checks if c.check_id in f.failed_checks)
+    if f.status is Status.EXCEPTION:
+        return f"accepted risk until {_ts(f.exception.expires_at)[:10]} ({reasons})"
+    if f.exception_state == "expired":
+        return f"{reasons} [exception EXPIRED {_ts(f.exception.expires_at)[:10]}]"
+    return reasons
+
+
+def write_console(result: RunResult, ui: Any) -> None:
+    """Kali-style result tables on the terminal (stderr via the UI object)."""
+    summary = summarize(result)
+    findings = sorted(
+        result.findings,
+        key=lambda f: (TABLE_ORDER[f.status], CRITICALITY_RANK.get(f.asset.criticality, 9), f.asset.hostname),
+    )
+    headers = ["ASSET", "ID", "CRITICALITY", "STATUS", "FAILED CHECKS", "OWNER", "DETAIL"]
+    rows = [
+        [f.asset.hostname, f.asset.asset_id, f.asset.criticality, (f.status.value, STATUS_COLORS[f.status]),
+         ", ".join(f.failed_checks) or "-", f.asset.owner, _console_detail(f)]
+        for f in findings
+    ]
+    if shutil.get_terminal_size((140, 24)).columns < NARROW_TERMINAL:
+        keep = [i for i, h in enumerate(headers) if h not in ("ID", "OWNER")]
+        headers = [headers[i] for i in keep]
+        rows = [[row[i] for i in keep] for row in rows]
+    control_ids = ", ".join(sorted({f.control_id for f in findings}))
+    ui.table(f"Findings: {control_ids} (worst first)", headers, rows)
+    ui.table(
+        "Untracked hosts: in SIEM, not in inventory",
+        ["HOSTNAME", "SOURCE TYPE", "LAST EVENT"],
+        [[u.hostname, u.source_type, _ts(u.last_event_at)] for u in result.untracked],
+    )
+    ui.table(
+        "Evidence quality issues",
+        ["FILE", "ROW", "RECORD", "FIELD", "PROBLEM"],
+        [[i.source_file, str(i.row or "-"), i.key, i.field, (i.problem, "yellow")] for i in result.data_quality],
+    )
+    ui.heading("Compliance")
+    ui.bar("PASS only", summary["compliance_pct"])
+    ui.bar("PASS + accepted exceptions", summary["compliance_pct_with_exceptions"])
+    ui.blank()

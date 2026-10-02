@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -14,6 +15,7 @@ from ax9 import cli
 from ax9.engine import evaluate, merge_sources, needs_action
 from ax9.ingest import load_controls, load_siem_sources
 from ax9.models import Asset, LogSource, RiskException, Status
+from ax9.ui import UI
 
 ROOT = Path(__file__).resolve().parent.parent
 AS_OF = datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc)
@@ -225,6 +227,33 @@ class ExitCodeTests(unittest.TestCase):
     def test_needs_action_ignores_valid_exceptions(self):
         result = run([asset()], [], [exception()])
         self.assertFalse(needs_action(result))
+
+
+class ConsoleTableTests(unittest.TestCase):
+    def _render(self, rows, encoding="utf-8", tty=False):
+        class Stream(io.StringIO):
+            def isatty(self):
+                return tty
+
+        Stream.encoding = encoding  # type: ignore[assignment]
+        stream = Stream()
+        UI(stream).table("t", ["NAME", "STATUS"], rows)
+        return [l for l in stream.getvalue().splitlines() if l.startswith("    ")]
+
+    def test_rows_are_aligned_even_with_colors(self):
+        lines = self._render([["a", ("FAIL", "red")], ["longer-name", ("PASS", "green")]], tty=True)
+        plain = [re.sub(r"\x1b\[[0-9;]*m", "", l) for l in lines]
+        self.assertEqual(len({len(l) for l in plain}), 1)
+        self.assertTrue(any("\x1b[31m" in l for l in lines))
+
+    def test_no_colors_when_not_a_tty(self):
+        lines = self._render([["a", ("FAIL", "red")]])
+        self.assertFalse(any("\x1b[" in l for l in lines))
+
+    def test_ascii_fallback_when_encoding_lacks_box_chars(self):
+        lines = self._render([["a", "PASS"]], encoding="ascii")
+        self.assertTrue(lines[0].strip().startswith("+-"))
+        "\n".join(lines).encode("ascii")
 
 
 if __name__ == "__main__":
