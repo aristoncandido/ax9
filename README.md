@@ -56,7 +56,7 @@ AX9 is deliberately **non-interactive**: it never prompts. That way the same com
 
 ### Terminal output
 
-On an interactive terminal, AX9 opens with an animated banner and a progress bar whose steps are the real stages of the run (load controls, parse inventory, parse SIEM sources, load exceptions, hash evidence, evaluate, write reports). The animation adds about 2.5 seconds and is skipped automatically when stderr is not a terminal (CI, pipes, cron), or on request with `--no-anim`.
+On an interactive terminal, AX9 opens with an animated banner and a progress bar whose steps are the real stages of the run (load controls, parse inventory, parse SIEM sources, load exceptions, hash evidence, evaluate, write reports). The animation adds about 4 seconds and is skipped automatically when stderr is not a terminal (CI, pipes, cron), or on request with `--no-anim`.
 
 Besides the report files, every run prints a colored summary on the terminal: a findings table sorted worst-first (MISSING → FAIL → STALE → EXCEPTION → PASS, then by asset criticality), untracked hosts, evidence quality issues and a compliance gauge.
 
