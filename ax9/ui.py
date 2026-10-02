@@ -18,6 +18,8 @@ BANNER = """\
 ██║  ██║██╔╝ ██╗ █████╔╝
 ╚═╝  ╚═╝╚═╝  ╚═╝ ╚════╝"""
 TAGLINE = "Audit X9 :: your logs can't hide"
+AUTHOR = "Ariston Cândido"
+AUTHOR_ASCII = "Ariston Candido"
 
 RESET = "\033[0m"
 COLORS = {
@@ -82,18 +84,22 @@ class UI:
             return
         art = BANNER if self.unicode else "AX9"
         tagline = f"  v{__version__}  {TAGLINE}"
+        credit = f"  developed by {AUTHOR if self._can_encode(AUTHOR) else AUTHOR_ASCII}"
         if not self.animate:
             self._write(self._paint(art, "red"))
-            self._write(tagline + "\n")
+            self._write(tagline)
+            self._write(self._paint(credit, "dim") + "\n")
             return
         for row in art.splitlines():
             self._write(self._paint(row, "red"))
             time.sleep(BANNER_LINE_DELAY)
-        for char in tagline:
-            self.stream.write(char)
-            self.stream.flush()
-            time.sleep(TAGLINE_CHAR_DELAY)
-        self._write("\n")
+        for text, color in ((tagline, None), (credit, "dim")):
+            for char in text:
+                self.stream.write(self._paint(char, color))
+                self.stream.flush()
+                time.sleep(TAGLINE_CHAR_DELAY)
+            self._write()
+        self._write()
 
     def progress(self, total: int) -> "Progress":
         """Animated single-line progress bar; does nothing when animation is off."""
