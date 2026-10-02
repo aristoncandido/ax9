@@ -1,0 +1,3 @@
+asset_id,control_id,reason,approved_by,approved_at,expires_at
+A006,LOG-01,Legacy settlement host cannot forward logs until platform migration,ciso@example.com,2026-06-15T10:00:00Z,2027-03-31T23:59:59Z
+A007,LOG-01,Reconciliation host log forwarder under replacement,ciso@example.com,2026-03-01T10:00:00Z,2026-08-31T23:59:59Z

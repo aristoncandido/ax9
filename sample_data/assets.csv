@@ -1,0 +1,11 @@
+asset_id,hostname,environment,pci_scope,owner,criticality
+A001,pay-gw-01,production,yes,payments-platform,critical
+A002,pay-db-01,production,yes,dba-team,critical
+A003,pay-api-01,production,yes,payments-platform,high
+A004,card-vault-01,production,yes,security-eng,critical
+A005,pay-batch-01,production,yes,payments-platform,high
+A006,legacy-settle-01,production,yes,finance-it,high
+A007,pay-recon-01,production,yes,finance-it,medium
+A008,hr-portal-01,production,no,hr-it,low
+A009,pay-tokenizer-01,production,yes,security-eng,critical
+A010,pay-edge-01,production,yes,network-team,high

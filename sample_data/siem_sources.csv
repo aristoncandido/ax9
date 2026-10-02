@@ -1,0 +1,10 @@
+hostname,source_type,last_event_at,retention_days,hot_retention_days
+pay-gw-01,linux_syslog,2026-10-01T08:55:00Z,400,90
+pay-db-01,database_audit,2026-09-28T14:10:00Z,400,90
+pay-api-01,app_log,2026-10-01T08:40:00Z,180,90
+card-vault-01,app_log,2026-10-01T08:58:00Z,365,30
+pay-recon-01,linux_syslog,2026-09-29T02:00:00Z,400,90
+hr-portal-01,app_log,2026-10-01T08:50:00Z,90,30
+pay-tokenizer-01,app_log,01/10/2026 08:30,400,90
+pay-edge-01,firewall,2026-10-05T12:00:00Z,400,90
+shadow-pay-07,linux_syslog,2026-10-01T08:45:00Z,400,90

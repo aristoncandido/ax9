@@ -1,0 +1,50 @@
+{
+  "controls": [
+    {
+      "id": "LOG-01",
+      "title": "Audit log coverage, freshness and retention for PCI in-scope assets",
+      "scope": { "field": "pci_scope", "equals": true },
+      "checks": {
+        "coverage":      { "description": "Asset must appear in the SIEM sources export." },
+        "freshness":     { "description": "Last event must be recent.", "max_age_hours": 24 },
+        "retention":     { "description": "Total log retention must meet the minimum.", "min_days": 365 },
+        "hot_retention": { "description": "Recent logs must be immediately searchable.", "min_days": 90 }
+      },
+      "status_precedence": ["MISSING", "FAIL", "STALE", "PASS"],
+      "mappings": [
+        {
+          "framework": "PCI DSS v4.0.1",
+          "requirement": "10.2.1",
+          "summary": "Audit logs are enabled and active for all system components.",
+          "supported_by": ["coverage"],
+          "rationale": "An asset present in the SIEM proves that it is sending audit logs to the central platform.",
+          "limitation": "Presence in the SIEM does not prove that every required event type is being logged."
+        },
+        {
+          "framework": "PCI DSS v4.0.1",
+          "requirement": "10.7.2",
+          "summary": "Failures of critical security control systems, including audit logging, are detected and addressed promptly.",
+          "supported_by": ["freshness"],
+          "rationale": "A log source that has gone silent is a logging failure; the freshness window shows whether it would be detected within a day.",
+          "limitation": "A fresh timestamp does not prove log content is complete, and this check does not prove an alert or ticket was raised."
+        },
+        {
+          "framework": "PCI DSS v4.0.1",
+          "requirement": "10.5.1",
+          "summary": "Audit log history is retained for at least 12 months, with the most recent 3 months immediately available.",
+          "supported_by": ["retention", "hot_retention"],
+          "rationale": "The SIEM-reported retention values are compared with the 12-month and 3-month minimums.",
+          "limitation": "Configured retention is not proof that old logs are actually intact and restorable; that needs a sampling test."
+        },
+        {
+          "framework": "SOC 2",
+          "requirement": "CC7.2",
+          "summary": "System components are monitored for anomalies indicative of malicious acts or errors.",
+          "supported_by": ["coverage", "freshness"],
+          "rationale": "Monitoring is only possible for components that send logs, and only meaningful if the logs are current.",
+          "limitation": "Does not prove that detection rules exist or that anomalies are actually reviewed."
+        }
+      ]
+    }
+  ]
+}

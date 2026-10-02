@@ -1,0 +1,888 @@
+{
+  "run": {
+    "as_of": "2026-10-01T09:00:00Z",
+    "tool_version": "1.0.0",
+    "input_sha256": {
+      "assets.csv": "a7d403e14f1de3953cbf544883ce6aa718ee9f96e7069c8ad28a7c9e79ee1686",
+      "siem_sources.csv": "657295284191d3b03cdd6e4e299fa4beefdf69d40bb047dc467ec3e279c84a93",
+      "exceptions.csv": "1d9d3afffb7b815d4603610f5af59341d7886f070ee0f7504e79b8377900fa54",
+      "controls.json": "8ff5f7936464298e7c696d0a2677b0e5ded9ef543a0d33d7ccf7d4d7899a424d"
+    }
+  },
+  "summary": {
+    "in_scope_assets": 9,
+    "out_of_scope_assets": 1,
+    "by_status": {
+      "PASS": 1,
+      "EXCEPTION": 1,
+      "STALE": 2,
+      "FAIL": 3,
+      "MISSING": 2
+    },
+    "untracked_hosts": 1,
+    "expired_exceptions": 1,
+    "data_quality_issues": 2,
+    "compliance_pct": 11.1,
+    "compliance_pct_with_exceptions": 22.2,
+    "action_required": true
+  },
+  "controls": [
+    {
+      "id": "LOG-01",
+      "title": "Audit log coverage, freshness and retention for PCI in-scope assets",
+      "scope": {
+        "field": "pci_scope",
+        "equals": true
+      },
+      "checks": {
+        "coverage": {
+          "description": "Asset must appear in the SIEM sources export."
+        },
+        "freshness": {
+          "description": "Last event must be recent.",
+          "max_age_hours": 24
+        },
+        "retention": {
+          "description": "Total log retention must meet the minimum.",
+          "min_days": 365
+        },
+        "hot_retention": {
+          "description": "Recent logs must be immediately searchable.",
+          "min_days": 90
+        }
+      },
+      "status_precedence": [
+        "MISSING",
+        "FAIL",
+        "STALE",
+        "PASS"
+      ],
+      "mappings": [
+        {
+          "framework": "PCI DSS v4.0.1",
+          "requirement": "10.2.1",
+          "summary": "Audit logs are enabled and active for all system components.",
+          "supported_by": [
+            "coverage"
+          ],
+          "rationale": "An asset present in the SIEM proves that it is sending audit logs to the central platform.",
+          "limitation": "Presence in the SIEM does not prove that every required event type is being logged."
+        },
+        {
+          "framework": "PCI DSS v4.0.1",
+          "requirement": "10.7.2",
+          "summary": "Failures of critical security control systems, including audit logging, are detected and addressed promptly.",
+          "supported_by": [
+            "freshness"
+          ],
+          "rationale": "A log source that has gone silent is a logging failure; the freshness window shows whether it would be detected within a day.",
+          "limitation": "A fresh timestamp does not prove log content is complete, and this check does not prove an alert or ticket was raised."
+        },
+        {
+          "framework": "PCI DSS v4.0.1",
+          "requirement": "10.5.1",
+          "summary": "Audit log history is retained for at least 12 months, with the most recent 3 months immediately available.",
+          "supported_by": [
+            "retention",
+            "hot_retention"
+          ],
+          "rationale": "The SIEM-reported retention values are compared with the 12-month and 3-month minimums.",
+          "limitation": "Configured retention is not proof that old logs are actually intact and restorable; that needs a sampling test."
+        },
+        {
+          "framework": "SOC 2",
+          "requirement": "CC7.2",
+          "summary": "System components are monitored for anomalies indicative of malicious acts or errors.",
+          "supported_by": [
+            "coverage",
+            "freshness"
+          ],
+          "rationale": "Monitoring is only possible for components that send logs, and only meaningful if the logs are current.",
+          "limitation": "Does not prove that detection rules exist or that anomalies are actually reviewed."
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A001",
+      "hostname": "pay-gw-01",
+      "environment": "production",
+      "owner": "payments-platform",
+      "criticality": "critical",
+      "status": "PASS",
+      "underlying_status": "PASS",
+      "failed_checks": [],
+      "exception_state": "none",
+      "exception": null,
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "PASS",
+          "reason": "asset found in SIEM",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "source_type=linux_syslog",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "PASS",
+          "reason": "recent events received",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "age=0.1h",
+            "timestamp": "2026-10-01T08:55:00Z",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "PASS",
+          "reason": "retention_days is 400d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "400d",
+            "timestamp": "2026-10-01T08:55:00Z",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "PASS",
+          "reason": "hot_retention_days is 90d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "90d",
+            "timestamp": "2026-10-01T08:55:00Z",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A002",
+      "hostname": "pay-db-01",
+      "environment": "production",
+      "owner": "dba-team",
+      "criticality": "critical",
+      "status": "STALE",
+      "underlying_status": "STALE",
+      "failed_checks": [
+        "freshness"
+      ],
+      "exception_state": "none",
+      "exception": null,
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "PASS",
+          "reason": "asset found in SIEM",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "source_type=database_audit",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "STALE",
+          "reason": "no events for 66.8h",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "age=66.8h",
+            "timestamp": "2026-09-28T14:10:00Z",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "PASS",
+          "reason": "retention_days is 400d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "400d",
+            "timestamp": "2026-09-28T14:10:00Z",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "PASS",
+          "reason": "hot_retention_days is 90d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "90d",
+            "timestamp": "2026-09-28T14:10:00Z",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A003",
+      "hostname": "pay-api-01",
+      "environment": "production",
+      "owner": "payments-platform",
+      "criticality": "high",
+      "status": "FAIL",
+      "underlying_status": "FAIL",
+      "failed_checks": [
+        "retention"
+      ],
+      "exception_state": "none",
+      "exception": null,
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "PASS",
+          "reason": "asset found in SIEM",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "source_type=app_log",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "PASS",
+          "reason": "recent events received",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "age=0.3h",
+            "timestamp": "2026-10-01T08:40:00Z",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "FAIL",
+          "reason": "retention_days is 180d, minimum is 365d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "180d",
+            "timestamp": "2026-10-01T08:40:00Z",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "PASS",
+          "reason": "hot_retention_days is 90d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "90d",
+            "timestamp": "2026-10-01T08:40:00Z",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A004",
+      "hostname": "card-vault-01",
+      "environment": "production",
+      "owner": "security-eng",
+      "criticality": "critical",
+      "status": "FAIL",
+      "underlying_status": "FAIL",
+      "failed_checks": [
+        "hot_retention"
+      ],
+      "exception_state": "none",
+      "exception": null,
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "PASS",
+          "reason": "asset found in SIEM",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "source_type=app_log",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "PASS",
+          "reason": "recent events received",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "age=0.0h",
+            "timestamp": "2026-10-01T08:58:00Z",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "PASS",
+          "reason": "retention_days is 365d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "365d",
+            "timestamp": "2026-10-01T08:58:00Z",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "FAIL",
+          "reason": "hot_retention_days is 30d, minimum is 90d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "30d",
+            "timestamp": "2026-10-01T08:58:00Z",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A005",
+      "hostname": "pay-batch-01",
+      "environment": "production",
+      "owner": "payments-platform",
+      "criticality": "high",
+      "status": "MISSING",
+      "underlying_status": "MISSING",
+      "failed_checks": [
+        "coverage"
+      ],
+      "exception_state": "none",
+      "exception": null,
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "MISSING",
+          "reason": "asset not found in SIEM sources",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "not found",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A006",
+      "hostname": "legacy-settle-01",
+      "environment": "production",
+      "owner": "finance-it",
+      "criticality": "high",
+      "status": "EXCEPTION",
+      "underlying_status": "MISSING",
+      "failed_checks": [
+        "coverage"
+      ],
+      "exception_state": "valid",
+      "exception": {
+        "reason": "Legacy settlement host cannot forward logs until platform migration",
+        "approved_by": "ciso@example.com",
+        "approved_at": "2026-06-15T10:00:00Z",
+        "expires_at": "2027-03-31T23:59:59Z"
+      },
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "MISSING",
+          "reason": "asset not found in SIEM sources",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "not found",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A007",
+      "hostname": "pay-recon-01",
+      "environment": "production",
+      "owner": "finance-it",
+      "criticality": "medium",
+      "status": "STALE",
+      "underlying_status": "STALE",
+      "failed_checks": [
+        "freshness"
+      ],
+      "exception_state": "expired",
+      "exception": {
+        "reason": "Reconciliation host log forwarder under replacement",
+        "approved_by": "ciso@example.com",
+        "approved_at": "2026-03-01T10:00:00Z",
+        "expires_at": "2026-08-31T23:59:59Z"
+      },
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "PASS",
+          "reason": "asset found in SIEM",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "source_type=linux_syslog",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "STALE",
+          "reason": "no events for 55.0h",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "age=55.0h",
+            "timestamp": "2026-09-29T02:00:00Z",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "PASS",
+          "reason": "retention_days is 400d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "400d",
+            "timestamp": "2026-09-29T02:00:00Z",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "PASS",
+          "reason": "hot_retention_days is 90d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "90d",
+            "timestamp": "2026-09-29T02:00:00Z",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A009",
+      "hostname": "pay-tokenizer-01",
+      "environment": "production",
+      "owner": "security-eng",
+      "criticality": "critical",
+      "status": "MISSING",
+      "underlying_status": "MISSING",
+      "failed_checks": [
+        "coverage"
+      ],
+      "exception_state": "none",
+      "exception": null,
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "MISSING",
+          "reason": "SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: Invalid isoformat string: '01/10/2026 08:30')",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "rejected row",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "NOT_EVALUATED",
+          "reason": "no valid SIEM evidence to evaluate",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "n/a",
+            "timestamp": "",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "control_id": "LOG-01",
+      "asset_id": "A010",
+      "hostname": "pay-edge-01",
+      "environment": "production",
+      "owner": "network-team",
+      "criticality": "high",
+      "status": "FAIL",
+      "underlying_status": "FAIL",
+      "failed_checks": [
+        "freshness"
+      ],
+      "exception_state": "none",
+      "exception": null,
+      "checks": [
+        {
+          "check_id": "coverage",
+          "status": "PASS",
+          "reason": "asset found in SIEM",
+          "requirements": [
+            "PCI DSS v4.0.1 10.2.1",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "source_type=firewall",
+            "timestamp": "",
+            "rule": "asset must appear in SIEM sources with valid evidence",
+            "threshold": "present",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "freshness",
+          "status": "FAIL",
+          "reason": "last_event_at is in the future (evidence integrity issue)",
+          "requirements": [
+            "PCI DSS v4.0.1 10.7.2",
+            "SOC 2 CC7.2"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "2026-10-05T12:00:00Z",
+            "timestamp": "2026-10-05T12:00:00Z",
+            "rule": "as_of - last_event_at <= max_age_hours",
+            "threshold": "<= 24h",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "retention",
+          "status": "PASS",
+          "reason": "retention_days is 400d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "400d",
+            "timestamp": "2026-10-05T12:00:00Z",
+            "rule": "retention_days >= min_days",
+            "threshold": ">= 365d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        },
+        {
+          "check_id": "hot_retention",
+          "status": "PASS",
+          "reason": "hot_retention_days is 90d",
+          "requirements": [
+            "PCI DSS v4.0.1 10.5.1"
+          ],
+          "evidence": {
+            "source_file": "siem_sources.csv",
+            "value": "90d",
+            "timestamp": "2026-10-05T12:00:00Z",
+            "rule": "hot_retention_days >= min_days",
+            "threshold": ">= 90d",
+            "evaluated_at": "2026-10-01T09:00:00Z"
+          }
+        }
+      ]
+    }
+  ],
+  "untracked_hosts": [
+    {
+      "hostname": "shadow-pay-07",
+      "source_type": "linux_syslog",
+      "last_event_at": "2026-10-01T08:45:00Z"
+    }
+  ],
+  "data_quality_issues": [
+    {
+      "source_file": "siem_sources.csv",
+      "row": 8,
+      "field": "last_event_at",
+      "value": "01/10/2026 08:30",
+      "problem": "invalid value: Invalid isoformat string: '01/10/2026 08:30'",
+      "key": "pay-tokenizer-01"
+    },
+    {
+      "source_file": "siem_sources.csv",
+      "row": 0,
+      "field": "last_event_at",
+      "value": "2026-10-05T12:00:00Z",
+      "problem": "timestamp is in the future (evidence integrity)",
+      "key": "pay-edge-01"
+    }
+  ]
+}
