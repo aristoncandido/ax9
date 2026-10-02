@@ -711,7 +711,7 @@
         {
           "check_id": "coverage",
           "status": "MISSING",
-          "reason": "SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: Invalid isoformat string: '01/10/2026 08:30')",
+          "reason": "SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '01/10/2026 08:30'))",
           "requirements": [
             "PCI DSS v4.0.1 10.2.1",
             "SOC 2 CC7.2"
@@ -873,7 +873,7 @@
       "row": 8,
       "field": "last_event_at",
       "value": "01/10/2026 08:30",
-      "problem": "invalid value: Invalid isoformat string: '01/10/2026 08:30'",
+      "problem": "invalid value: expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '01/10/2026 08:30')",
       "key": "pay-tokenizer-01"
     },
     {

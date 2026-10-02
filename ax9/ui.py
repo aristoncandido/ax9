@@ -63,8 +63,8 @@ HIDE_CURSOR, SHOW_CURSOR = "\033[?25l", "\033[?25h"
 CLEAR_LINE = "\r\033[K"  # go to column 0 and erase the line: lets the bar redraw itself in place
 BANNER_LINE_DELAY = 0.06
 TAGLINE_CHAR_DELAY = 0.012
-STEP_SECONDS = 0.40
-STEP_FRAMES = 12
+STEP_SECONDS = 0.12
+STEP_FRAMES = 6
 
 # C0/C1 control characters (ESC, BEL, backspace, ...), never legitimate inside a table cell.
 CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f]")

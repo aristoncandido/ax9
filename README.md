@@ -12,8 +12,21 @@ python -m ax9 --as-of 2026-10-01T09:00:00Z
 ```
 
 - Python 3.10+ and the standard library only: no `pip install`, no network, no credentials.
-- 36 unit tests.
+- 39 unit tests.
 - Outputs for machines (JSON), analysts (CSV), managers (Markdown) and humans at a terminal (colored tables).
+
+### Reviewer quick path
+
+| Deliverable | Where |
+|---|---|
+| Run | `python -m ax9 --as-of 2026-10-01T09:00:00Z` |
+| Tests | `python -m unittest discover -s tests -v` |
+| Selected control | [§6 The control and its checks](#6-the-control-and-its-checks) |
+| Framework mapping | [§8 Framework mapping](#8-framework-mapping) |
+| Validation logic | [§6 Checks](#6-the-control-and-its-checks) and [§7 Statuses](#7-statuses) |
+| Assumptions and limitations | [§17 Assumptions and limitations](#17-assumptions-and-limitations) |
+| Sample input | [`sample_data/`](sample_data/) |
+| Sample output | [`sample_output/report.md`](sample_output/report.md) (also `results.csv`, `results.json`) |
 
 ---
 
@@ -160,7 +173,7 @@ How to read the prefixes (Metasploit style):
 
 The findings table is sorted **worst first**, then by asset criticality, so the most urgent line is the first one you read. Long details are cut to fit the screen; the full text is always in the report files.
 
-The animation lasts about 4 seconds and only runs on an interactive terminal. In CI, in a pipe or with `--no-anim` it is skipped and the run takes a fraction of a second.
+The progress bar takes about 1 second (plus the short banner) and only runs on an interactive terminal. In CI, in a pipe or with `--no-anim` it is skipped and the run takes a fraction of a second.
 
 ---
 
@@ -541,7 +554,7 @@ All are frozen dataclasses: once created they cannot be changed, as audit eviden
 python3 -m unittest discover -s tests -v
 ```
 
-36 tests in `tests/test_engine.py`, grouped by what they protect:
+39 tests in `tests/test_engine.py`, grouped by what they protect:
 
 | Group | Guarantees |
 |---|---|
@@ -554,6 +567,7 @@ python3 -m unittest discover -s tests -v
 | `ConsoleTableTests` | Tables stay aligned with colors, no colors outside a terminal, ASCII fallback |
 | `ControlsValidationTests` | Mistakes in `controls.json` produce clear errors |
 | `InputRobustnessTests` | Directories, non-UTF-8 files and other bad inputs end in exit 2, not a traceback |
+| `TimestampMessageTests` | Bad or timezone-less dates get a clear "expected ISO 8601 with timezone" message |
 | `OutputSafetyTests` | CSV formula injection and terminal escape injection are neutralised |
 
 **Testing the tests:** a test that has never failed proves little. Break a rule on purpose (for example change `>` to `>=` in `check_freshness`), run the suite, confirm a test goes red, then undo the change.

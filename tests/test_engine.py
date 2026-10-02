@@ -24,7 +24,7 @@ from pathlib import Path
 
 from ax9 import cli
 from ax9.engine import CHECKS, evaluate, merge_sources, needs_action
-from ax9.ingest import KNOWN_CHECKS, IngestError, load_controls, load_siem_sources
+from ax9.ingest import KNOWN_CHECKS, IngestError, load_controls, load_siem_sources, parse_timestamp
 from ax9.reporters import write_csv
 from ax9.models import Asset, LogSource, RiskException, Status
 from ax9.ui import UI, sanitize
@@ -329,6 +329,30 @@ class InputRobustnessTests(unittest.TestCase):
                 load_siem_sources(path)
         finally:
             shutil.rmtree(tmp)
+
+
+class TimestampMessageTests(unittest.TestCase):
+    """Whoever fixes a broken export must be told exactly what format is expected."""
+
+    def test_bad_format_message(self):
+        with self.assertRaises(ValueError) as ctx:
+            parse_timestamp("01/10/2026 08:30")
+        self.assertEqual(
+            str(ctx.exception),
+            "expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '01/10/2026 08:30')",
+        )
+
+    def test_missing_timezone_message(self):
+        with self.assertRaises(ValueError) as ctx:
+            parse_timestamp("2026-10-01T08:30:00")
+        self.assertEqual(
+            str(ctx.exception),
+            "expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '2026-10-01T08:30:00')",
+        )
+
+    def test_valid_timestamps_still_parse(self):
+        self.assertEqual(parse_timestamp("2026-10-01T08:30:00Z"), datetime(2026, 10, 1, 8, 30, tzinfo=timezone.utc))
+        self.assertEqual(parse_timestamp("2026-10-01T05:30:00-03:00"), datetime(2026, 10, 1, 8, 30, tzinfo=timezone.utc))
 
 
 class OutputSafetyTests(unittest.TestCase):

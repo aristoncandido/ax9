@@ -44,7 +44,7 @@ _Audit logs are enabled and active for all system components._
 |---|---|---|---|---|
 | pay-batch-01 | coverage | MISSING | asset not found in SIEM sources | MISSING |
 | legacy-settle-01 | coverage | MISSING | asset not found in SIEM sources | EXCEPTION |
-| pay-tokenizer-01 | coverage | MISSING | SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: Invalid isoformat string: '01/10/2026 08:30') | MISSING |
+| pay-tokenizer-01 | coverage | MISSING | SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '01/10/2026 08:30')) | MISSING |
 
 ### PCI DSS v4.0.1 10.7.2
 
@@ -87,7 +87,7 @@ _System components are monitored for anomalies indicative of malicious acts or e
 | pay-batch-01 | coverage | MISSING | asset not found in SIEM sources | MISSING |
 | legacy-settle-01 | coverage | MISSING | asset not found in SIEM sources | EXCEPTION |
 | pay-recon-01 | freshness | STALE | no events for 55.0h | STALE |
-| pay-tokenizer-01 | coverage | MISSING | SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: Invalid isoformat string: '01/10/2026 08:30') | MISSING |
+| pay-tokenizer-01 | coverage | MISSING | SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '01/10/2026 08:30')) | MISSING |
 | pay-edge-01 | freshness | FAIL | last_event_at is in the future (evidence integrity issue) | FAIL |
 
 ## 3. Missing and stale evidence
@@ -98,7 +98,7 @@ _System components are monitored for anomalies indicative of malicious acts or e
 | pay-batch-01 | MISSING | asset not found in SIEM sources |
 | legacy-settle-01 | EXCEPTION (MISSING) | asset not found in SIEM sources |
 | pay-recon-01 | STALE | no events for 55.0h |
-| pay-tokenizer-01 | MISSING | SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: Invalid isoformat string: '01/10/2026 08:30') |
+| pay-tokenizer-01 | MISSING | SIEM row rejected as untrustworthy evidence: last_event_at='01/10/2026 08:30' (invalid value: expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '01/10/2026 08:30')) |
 
 ## 4. Exceptions (risk acceptances)
 
@@ -119,7 +119,7 @@ An EXPIRED exception does not apply: the asset is reported with its original fin
 
 | File | Row | Record | Field | Value | Problem |
 |---|---|---|---|---|---|
-| siem_sources.csv | 8 | pay-tokenizer-01 | last_event_at | 01/10/2026 08:30 | invalid value: Invalid isoformat string: '01/10/2026 08:30' |
+| siem_sources.csv | 8 | pay-tokenizer-01 | last_event_at | 01/10/2026 08:30 | invalid value: expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '01/10/2026 08:30') |
 | siem_sources.csv | n/a | pay-edge-01 | last_event_at | 2026-10-05T12:00:00Z | timestamp is in the future (evidence integrity) |
 
 ## 7. Recommended actions

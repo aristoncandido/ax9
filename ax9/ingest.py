@@ -77,12 +77,19 @@ def parse_timestamp(raw: str) -> datetime:
     is not acceptable audit evidence. Raises ValueError, which the row loop
     turns into a DataQualityIssue.
     """
-    text = raw.strip()
+    original = raw.strip()
+    # One message for both failures (bad format, missing timezone): it tells
+    # whoever fixes the export exactly what is expected.
+    error = ValueError(f"expected ISO 8601 with timezone, e.g. 2026-10-01T08:30:00Z (got '{original}')")
+    text = original
     if text.endswith(("Z", "z")):  # Python < 3.11 does not understand the "Z" suffix
         text = text[:-1] + "+00:00"
-    parsed = datetime.fromisoformat(text)
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        raise error from None
     if parsed.tzinfo is None:
-        raise ValueError("timestamp has no timezone")
+        raise error
     return parsed.astimezone(timezone.utc)
 
 
